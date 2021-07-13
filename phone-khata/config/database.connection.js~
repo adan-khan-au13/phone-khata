@@ -1,0 +1,61 @@
+const Sequelize = require('sequelize');
+// const config = require('./config.env');
+// const conf = require('dotenv').config();
+// const UserSchema = require('../schema/signup') 
+
+
+const database = new Sequelize("bahi_khata","postgres","",
+    {
+    host:'localhost',
+    dialect:'postgres'
+    }
+);  
+
+
+// const database = new Sequelize(
+//     process.env.DATABASE_NAME,
+//     process.env.USERNAME,
+//     process.env.PASSWORD,
+//     {
+//     host:'topsy.db.elephantsql.com',
+//     dialect:'postgres'
+//     }
+// );
+
+// const database = new Sequelize(
+//     "scmlqtrk",
+//     "scmlqtrk",
+//     "9x_L74qgEpjHqvDX4vu6AWx6tN3GSt3-",
+//     {
+//     host:'topsy.db.elephantsql.com',
+//     dialect:'postgres'
+//     }
+// );
+
+//It will create the table if it is not exist
+database.sync({
+    force:false,
+    // alter:true
+})
+
+// const database = new Sequelize(
+//     "akshay",
+//     "akshay",
+//     "12345",
+//     {
+//     host:'localhost',
+//     dialect:'postgres'
+//     }
+// );
+
+
+
+// try {
+//     database.authenticate()
+//     // database.sync()
+//     console.log("Connected to Database")
+// } catch (error) {
+//     console.log("Error in connecting to Database and error is " + error)
+// }
+
+module.exports = database

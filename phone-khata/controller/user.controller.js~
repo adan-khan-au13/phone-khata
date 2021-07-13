@@ -1,0 +1,199 @@
+require('dotenv').config({
+    path:'/config/.env'
+})
+const jwt = require('jsonwebtoken')
+const bcrypt = require('bcrypt')
+const UserSignup = require('../models/signup')
+const {sendEmail , generate_otp} = require("../utils/nodemail");
+const customerSchema = require('../models/user')
+
+var controller = {
+
+//Signup Controller
+signing : (req,res,next)=>{
+    //hashsync will not return the promise but only the hashed password
+    let hashedPassword = bcrypt.hashSync(req.body.password,10)
+    let sign_up = new UserSignup({
+        name: req.body.name,
+        firm_name:req.body.firm_name,
+        email:req.body.email,
+        password: hashedPassword
+    })
+3
+    // console.log(hashedPassword)
+    const message = `Welcome to Bahi_Khata Family`
+    
+    try {
+        sendEmail({
+            email:sign_up.email,
+            message
+        })
+    }catch (error) {
+        res.status(500).json({
+            message:"Couldn't send the email",
+            errors:error
+        })
+    }
+    sign_up.save()
+    .then(function(val){
+        res.status(201).json({
+            message:`Please verify the otp which is sent to the given email address ${sign_up.email}`
+        })
+    })
+    .catch((err)=>{
+        if(JSON.stringify(err).indexOf("email must be unique")>-1){
+            res.status(400).json({
+                error:"Email alreasy exists!!!"
+            })
+        }
+        else{
+            console.log("Error while signing up the user ",JSON.stringify(err))
+                res.status(400).json({
+                message:"Error in creating user",
+                error:err
+            })
+        }
+    })
+},
+
+/*Verify the otp sent through mail. 
+If verified, will redirect to login page else redirect to signup page*/
+
+verify_otp:(req,res)=>{
+    let otp = req.body.otp
+    if(otp === generate_otp){
+        res.status(200).json({
+            message:"Email successfully verified....please login to continue"
+        })
+    }else{
+        res.status(404).json({
+            message:"Invalid OTP"
+        })
+    }
+},
+
+//Login controller.
+/**
+ * Once the user hit wrong email or password, it will throw the error.
+ * Else if everything is correct, will redirect to dashboard.
+ */
+login : (req,res)=>{
+    UserSignup.findOne({
+        where:{
+            email:req.body.email
+        },
+    })
+    .then((data)=>{
+        if(data === null){
+            res.status(401).json({                                 
+                message:"Please check your email/password"
+            })
+        }
+        else{
+            //comparesync will return boolean value 
+            console.log("Body",req.body.password)
+            console.log("Data" , data.password)
+            let boolean = bcrypt.compareSync(req.body.password , data.password)
+            if(boolean == true){
+                const token = jwt.sign({
+                    email: data.email,
+                    user_id: data.uuid
+                },process.env.JWT_SECRETKEY, {
+                    expiresIn: process.env.JWT_EXPIRES
+                })
+                console.log(process.env.JWT_SECRETKEY)
+                res.status(200).json({
+                    message:"Successfully logged in!!!",
+                    token: token
+                })
+            }else{
+                res.status(401).json({
+                    message:"Invalid Password!!"
+                })
+            }
+        }
+    })
+    .catch((err)=>{
+            console.log("Error while login done by user ",JSON.stringify(err))
+            res.json({
+                message:"Cannot log in",
+                error:err.message
+            })
+        })
+    },
+
+
+//Dashboard
+/**
+ * Here, the user can all their customers when they successfully logs in.
+ */
+home : (req,res)=>{
+    // console.log("Data",req.app.get("data1"))
+    customerSchema.findAll({
+        where:{
+            user_id:req.app.get("data1").user_id
+        }
+    })
+    .then((data)=>{
+        if(data.length>0){
+        res.status(200).json({
+            message:"Found",
+            data:data
+        })
+        }else{
+            res.status(404).json({
+                message:"No customer's info found"
+            })
+        }
+    })
+    .catch((err)=>{
+        console.log("Error while showing dashboard to user ",JSON.stringify(err))
+        res.status(404).json({
+            message:"Couldn't find your request",
+            error:err.message
+        })
+    })
+},
+
+//Update user info
+update:(req,res)=>{
+    UserSignup.findOne({
+        where:{
+            uuid:req.params.uuid
+        }
+    })
+    .then(data=>{
+        console.log("Data is ")
+        if(!data){
+            res.status(400).json({
+                message:`No user exists with uuid ${req.params.uuid}`
+            })
+        }
+        else{
+            data.name=req.body.name,
+            data.firm_name=req.body.firm_name,
+            data.email=req.body.email,
+            data.password=req.body.password
+
+            return data.save()
+        }
+    })
+    .then((data)=>{
+        if(data){
+            res.status(200).json({
+                message:`Updated user's information`
+            })
+        }
+    })
+    .catch((err)=>{
+        console.log("Error while updating user ",JSON.stringify(err))
+        res.json({
+            message:`Error in updating user's info with uuid ${req.params.uuid}`,
+            error:err.message
+            
+        })
+    })
+}
+}
+
+module.exports = { controller }
